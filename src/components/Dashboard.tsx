@@ -27,7 +27,7 @@ const Dashboard: React.FC = () => {
             <StatusCard 
               title="Deployment Status"
               status="success"
-              message="Congratulations Manual Build and Deployment of React Application is Successfull using Azure"
+              message="Congratulations Build and Deployment of React Application is Successfull using Azure"
               timestamp={new Date().toLocaleString()}
             />
           </FadeIn>
