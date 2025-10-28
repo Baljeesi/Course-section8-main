@@ -1,0 +1,14 @@
+# templates/ssh-setup.yml
+parameters:
+  aws_ip: ''
+  ssh_key: ''
+
+steps:
+- script: |
+    mkdir -p ~/.ssh
+    echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    chmod 600 ~/.ssh/id_rsa
+    ssh-keyscan -H ${{ parameters.aws_ip }} >> ~/.ssh/known_hosts
+  displayName: 'Setup SSH Key'
+  env:
+    SSH_KEY: ${{ parameters.ssh_key }}
