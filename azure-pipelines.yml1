@@ -1,0 +1,124 @@
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+- group: course_new
+- name: AWS_PRIVATE_IP
+  value: '172.31.23.70'
+- name: REPO_PATH
+  value: '/home/ubuntu/course'
+
+# =====================================================
+# Stage 1: Pre-Requisites
+# =====================================================
+stages:
+- stage: PreRequisites
+  displayName: 'Pre-requisites'
+  jobs:
+  - job: PreReqJob
+    displayName: 'Prepare the EC2 Instance'
+    pool:
+      name: 'aws ec2'
+      demands:
+        - agent.name -equals cicd
+    steps:
+    # Reusable SSH setup
+    - template: templates/setup_ssh.yml
+      parameters:
+        aws_ip: $(AWS_PRIVATE_IP)
+        ssh_key: $(SSH_KEY)
+       
+
+    # Corrected Pre-Requisites Commands
+    - script: |
+        ssh -o StrictHostKeyChecking=no ubuntu@$(AWS_PRIVATE_IP) << EOF
+          # Remove old course directories
+          rm -rf ~/course*
+
+          # Clone the repo securely using secret PAT
+          git clone https://baljeets1790:${MY_PAT}@dev.azure.com/baljeets1790/course/_git/course $(REPO_PATH)
+
+          # Move into repo directory
+          cd $(REPO_PATH)
+
+          # Make build and deploy scripts executable
+          chmod +x build.sh deploy.sh
+        EOF
+      displayName: 'Run Pre-Requisites'
+      env:
+        MY_PAT: $(MySecretPAT)
+
+# =====================================================
+# Stage 2: Build
+# =====================================================
+- stage: Build
+  dependsOn: PreRequisites
+  jobs:
+  - job: BuildJob
+    displayName: 'Run Build Script on EC2'
+    pool:
+      name: 'aws ec2'
+      demands:
+        - agent.name -equals cicd
+    steps:
+    # Reusable SSH setup
+    - template: templates/setup_ssh.yml
+      parameters:
+        aws_ip: $(AWS_PRIVATE_IP)
+        ssh_key: $(SSH_KEY)
+
+    # Run Build
+    - script: |
+        ssh -o StrictHostKeyChecking=no ubuntu@$(AWS_PRIVATE_IP) "bash $(REPO_PATH)/build.sh"
+      displayName: 'Build App'
+
+# =====================================================
+# Stage 3: Deploy
+# =====================================================
+- stage: Deploy
+  dependsOn: Build
+  jobs:
+  - job: DeployJob
+    displayName: 'Run Deploy Script on EC2'
+    pool:
+      name: 'aws ec2'
+      demands:
+        - agent.name -equals cicd
+    steps:
+    # Reusable SSH setup
+    - template: templates/setup_ssh.yml
+      parameters:
+        aws_ip: $(AWS_PRIVATE_IP)
+        ssh_key: $(SSH_KEY)
+
+    # Run Deploy
+    - script: |
+        ssh -o StrictHostKeyChecking=no ubuntu@$(AWS_PRIVATE_IP) "bash $(REPO_PATH)/deploy.sh"
+      displayName: 'Deploy App'
+# =====================================================
+# Optional: Manual Approval for Production
+# =================================================####
+# - stage: Deploy
+#   dependsOn: Build
+#   jobs:
+#   - deployment: DeployJob
+#     displayName: 'Run Deploy Script on EC2'
+#     environment: test
+#     pool:
+#       name: 'aws ec2'
+#       demands:
+#         - agent.name -equals cicd
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#             - template: templates/setup_ssh.yml
+#               parameters:
+#                 aws_ip: $(AWS_PRIVATE_IP)
+#                 ssh_key: $(SSH_KEY)
+#
+#             - script: |
+#                 ssh -o StrictHostKeyChecking=no ubuntu@$(AWS_PRIVATE_IP) "bash ~/sagar2/deploy.sh"
+#               displayName: 'Deploy App'
