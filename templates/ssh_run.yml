@@ -1,0 +1,18 @@
+# templates/ssh_run.yml
+parameters:
+  aws_ip: ''
+  ssh_key: ''
+  command: ''
+
+steps:
+- script: |
+    mkdir -p ~/.ssh
+    echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    chmod 600 ~/.ssh/id_rsa
+    ssh-keyscan -H ${{ parameters.aws_ip }} >> ~/.ssh/known_hosts
+
+    ssh -o StrictHostKeyChecking=no ubuntu@${{ parameters.aws_ip }} "${{ parameters.command }}"
+  displayName: 'Run SSH Command'
+  env:
+    SSH_KEY: $(SSH_KEY)
+    MY_PAT: $(MySecretPAT)
